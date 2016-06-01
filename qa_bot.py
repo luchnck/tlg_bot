@@ -40,7 +40,10 @@ class Handler(tornado.web.RequestHandler):
                     arguments = ''
                     if (text.find(' ') == True):
                         command, arguments = text.split(" ", 1)
-                    response = CMD.get(command,not_found)(arguments,message)
+                    if (CMD.has_key(command)):
+                        response = CMD.get(command)(arguments,message)
+                    else:
+                        response = CMD.get(not_found)(arguments,message)
                     logging.info("REPLY\t%s\t%s" % (message['chat']['id'], response))
                     send_reply(response)
 #        except Exception as e:
