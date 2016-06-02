@@ -15,9 +15,9 @@ import json
 logging.basicConfig(level = logging.DEBUG)
 
 BOT_TOKEN = '235765450:AAGWZ5N-0OFylLjOpmYXUQfBZlI-Cd0y-28'
-#URL = "https://api.telegram.org/bot%s/" % BOT_TOKEN
+URL = "https://api.telegram.org/bot%s/" % BOT_TOKEN
 MyURL = "https://54.199.228.119/"
-URL = "http://localhost:8001/"
+#URL = "http://localhost:8001/"
 
 dsn = "user=postgres password=postgres dbname=qa_bot host=localhost port=5432"
 
@@ -42,7 +42,7 @@ class app(tornado.web.Application):
     def sendMessage(self,response):
         logging.debug('Message will be sent on url %s' % URL)
         httpClient = tornado.httpclient.AsyncHTTPClient()
-        postRequest = tornado.httpclient.HTTPRequest( url="http://yandex.ru",method="POST", body=json.dumps(response), headers=tornado.httputil.HTTPHeaders( {"content-type": "application/json","method": "POST"} ) )
+        postRequest = tornado.httpclient.HTTPRequest( url= URL + "sendMessage",method="POST", body=json.dumps(response), headers=tornado.httputil.HTTPHeaders( {"content-type": "application/json","method": "POST"} ) )
         response = yield httpClient.fetch( postRequest )
         self.sendedMessage(response)
 
@@ -52,10 +52,15 @@ class TestHandler(tornado.web.RequestHandler):
         return self.application.db
 
     @gen.coroutine
-    def get(self):
+    def post(self):
+        update = tornado.escape.json_decode(self.request.body)
+
         cursor = yield self.db.execute('SELECT * FROM public.qa')
-        response = {'text': 'Query results: %s' % cursor.fetchall()}
-        response = yield self.application.sendMessage(response)
+        request =  {
+                                  "text" : "Query results: %s" % cursor.fetchall(),
+                                  "chat_id" : update['message']['chat']['id'],
+                   }
+        response = yield self.application.sendMessage(request)
         self.finish()       
 
 class Handler(tornado.web.RequestHandler):
@@ -113,18 +118,18 @@ if __name__ == '__main__':
         ioloop = tornado.ioloop.IOLoop.instance() 
         api = requests.Session()
         application = app([
-            (r"/", Handler),
-            (r"/connectiontest", TestHandler)
+            (r"/connectiontest", TestHandler),
+            (r"/", TestHandler),
         ])
 
         CMD['/help'] = help_message
         CMD['/start'] = start
         url = URL + "setWebhook?url=%s" % MyURL
         files = {'certificate' : open('/usr/share/nginx/qa_bot/qa_bot_company.pem','rb')}
-        #set_hook = api.post(url, files = files)
-        #if set_hook.status_code != 200:
-        #       logging.error("Cant set hook: %s. Quit", set_hook.text)
-        #       exit(1)
+        set_hook = api.post(url, files = files)
+        if set_hook.status_code != 200:
+               logging.error("Cant set hook: %s. Quit", set_hook.text)
+               exit(1)
         
         
         application.db = momoko.Pool(
