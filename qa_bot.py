@@ -55,10 +55,7 @@ class TestHandler(tornado.web.RequestHandler):
     def get(self):
         cursor = yield self.db.execute('SELECT * FROM public.qa')
         response = {'text': 'Query results: %s' % cursor.fetchall()}
-        self.write(response)
-        self.method = "POST"
-        self.url = URL + "sendMessage"
-#        pprint(getmembers(self))
+        response = yield self.application.sendMessage(response)
         self.finish()       
 
 class Handler(tornado.web.RequestHandler):
@@ -81,13 +78,15 @@ class Handler(tornado.web.RequestHandler):
                     arguments = ''
                     if (text.find(' ') == True):
                         command, arguments = text.split(" ", 1)
-#                    if (CMD.has_key(command)):
+#                    if (CMD.has_key(command)):i
+# ToDo:
+# сделать словари парсинга команд 
+# 
                         response = CMD.get(command)(arguments,message)
                     else:
                         response = CMD.get(not_found)(arguments,message)
                     logging.info("REPLY\t%s\t%s" % (message['chat']['id'], response))
                     yield self.application.sendMessage(response)
-                    self.write(response)
             self.finish() 
 #        except Exception as e:
 #            logging.warning(str(e))
