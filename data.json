@@ -1,0 +1,8 @@
+{
+    'answer': 'waited_answer',
+    'img': {
+        'picture_index': 'path_to_image',
+    },
+    'text': 'task_text',
+}
+
