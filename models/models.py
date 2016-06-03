@@ -5,18 +5,27 @@ class Model():
         if (len(where.keys()) > 0):
             if_where = []
             for i in where.keys():
-                if_where.append(i + ' = "' + str(where[i])+'"')
+                if i in self._strings:
+                    if_where.append(i + " = '" + str(where[i])+"'")
+                else:
+                    if_where.append(i + ' = ' + str(where[i]))
                 whereStr = str.join(' AND ',if_where)
                 whereStr = "WHERE " + whereStr
         query = (str.join(',', fields), table, whereStr)
-        return queryStr, query
+        return str(queryStr % query)
 
     def insert(self, fields, table):
         queryStr = "INSERT INTO %s(%s) VALUES(%s)"
         if (len(fields.keys()) <= 0 ):
              return
-        insertStr = (table, str.join(',',fields.keys()),'"'+str.join('","',[str(item) for item in fields.values()]) + '"')
-        return queryStr, insertStr
+        values = []
+        for val in fields.keys():
+             if val in self._strings:
+                 values.append("'%s'" % fields[val])
+             else:
+                 values.append('%s' %  fields[val])
+        insertStr = (table, str.join(',',fields.keys()),str.join(',',values))
+        return str(queryStr % insertStr)
         
     def _getNotEmptyVars(self):
         vars =  [ arg for arg in dir(self) if (not arg.startswith('_')) & ( not callable(getattr(self,arg))) ]
@@ -51,7 +60,7 @@ class User(Model):
         self.progress = ''
         self.timescore = ''
         self._table = "public.user"
-    
+        self._strings = []   
 
 
 class Task(Model):
@@ -62,6 +71,8 @@ class Task(Model):
         self.topic = ''
         self.answer = ''
         self._table = "public.task"
+        self._strings = ['text', 'images','topic','answer']
+
 
 def main():    
      import momoko
