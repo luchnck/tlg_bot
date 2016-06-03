@@ -12,6 +12,8 @@ from pprint import pprint
 from inspect import getmembers
 import json
 
+from models.models import User,Task
+
 logging.basicConfig(level = logging.DEBUG)
 
 BOT_TOKEN = '235765450:AAGWZ5N-0OFylLjOpmYXUQfBZlI-Cd0y-28'
