@@ -60,7 +60,10 @@ class User(Model):
         self.progress = ''
         self.timescore = ''
         self._table = "public.user"
-        self._strings = []   
+        self._strings = []
+
+    def isUserRegistered(self):
+        pass   
 
 
 class Task(Model):

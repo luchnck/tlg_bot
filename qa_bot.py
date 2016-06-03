@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 # -*- coding: utf-8 -*-
 
 import os
@@ -12,7 +12,11 @@ from pprint import pprint
 from inspect import getmembers
 import json
 
-from models.models import User,Task
+sys.path.append(os.path.abspath('routes'))
+sys.path.append(os.path.abspath('models'))
+
+from routes.routes import StartHandler,InitHandler
+
 
 logging.basicConfig(level = logging.DEBUG)
 
@@ -44,7 +48,14 @@ class app(tornado.web.Application):
     def sendMessage(self,response):
         logging.debug('Message will be sent on url %s' % URL)
         httpClient = tornado.httpclient.AsyncHTTPClient()
-        postRequest = tornado.httpclient.HTTPRequest( url= URL + "sendMessage",method="POST", body=json.dumps(response), headers=tornado.httputil.HTTPHeaders( {"content-type": "application/json","method": "POST"} ) )
+        postRequest = tornado.httpclient.HTTPRequest( url= URL + "sendMessage",
+                                                      method="POST", 
+                                                      body=json.dumps(response), 
+                                                      headers=tornado.httputil.HTTPHeaders( {
+                                                                                             "content-type": "application/json",
+                                                                                             "method": "POST"
+                                                                                             } ) 
+                                                    )
         response = yield httpClient.fetch( postRequest )
         self.sendedMessage(response)
 
@@ -120,8 +131,9 @@ if __name__ == '__main__':
         ioloop = tornado.ioloop.IOLoop.instance() 
         api = requests.Session()
         application = app([
+            (r"/", StartHandler),
             (r"/connectiontest", TestHandler),
-            (r"/", TestHandler),
+            (r"/start", StartHandler),
         ])
 
         CMD['/help'] = help_message
