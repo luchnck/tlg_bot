@@ -15,7 +15,7 @@ import json
 sys.path.append(os.path.abspath('routes'))
 sys.path.append(os.path.abspath('models'))
 
-from routes.routes import StartHandler,InitHandler
+from routes.routes import mainHandler
 
 
 logging.basicConfig(level = logging.DEBUG)
@@ -131,13 +131,9 @@ if __name__ == '__main__':
         ioloop = tornado.ioloop.IOLoop.instance() 
         api = requests.Session()
         application = app([
-            (r"/", StartHandler),
-            (r"/connectiontest", TestHandler),
-            (r"/start", StartHandler),
+            (r"/", mainHandler),
         ])
 
-        CMD['/help'] = help_message
-        CMD['/start'] = start
         url = URL + "setWebhook?url=%s" % MyURL
         files = {'certificate' : open('/usr/share/nginx/qa_bot/qa_bot_company.pem','rb')}
         set_hook = api.post(url, files = files)
