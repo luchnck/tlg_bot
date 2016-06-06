@@ -27,16 +27,14 @@ def main():
      a.chat_id = 6 
      a.progress = 2
      a.time_score = "123456"
-     print(a.insertThis())
-     query = a.insertThis()
 
-     future = a.execute(query)
+     future = a.insertThis()
      ioloop.add_future(future, lambda x: ioloop.stop())
      ioloop.start()
      print(future.result())
+    
      
-     
-     future = a.execute(a.selectThis())
+     future = a.selectThis()
      ioloop.add_future(future, lambda x: ioloop.stop())
      ioloop.start()
      print(future.result())
