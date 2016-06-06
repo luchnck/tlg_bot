@@ -1,4 +1,29 @@
+import re
+from tornado import gen
+import logging
+
 class Model():
+    def __init__(self,db):
+        self._db = db
+        
+#    @property
+#    def db(self):
+#        return self._db
+    
+    @gen.coroutine
+    def execute(self, query):
+        result = False
+        try:
+            result = yield self._db.execute(query)
+        except Exception as e:
+            logging.error("Model.execute(): Unable to execute query: %s becouse %s" % (query, e) )
+            gen.Return(False)
+        if ((re.match('SELECT', query, re.IGNORECASE))!= None):
+            rows = result.fetchall()
+            raise gen.Return(rows)
+        else:
+            raise gen.Return(True)
+
     def select(self, fields = '*', where = {}, table = ''):
         queryStr = "SELECT %s FROM %s %s"
         whereStr = ''
@@ -54,11 +79,12 @@ class Model():
 
 class User(Model):
 
-    def __init__(self):
+    def __init__(self,db):
+        super(User,self).__init__(db)
         self.chat_id = ''
-        self.task_id = ''
+        self.game_id = ''
         self.progress = ''
-        self.timescore = ''
+        self.time_score = ''
         self._table = "public.user"
         self._strings = []
 
@@ -68,6 +94,7 @@ class User(Model):
 
 class Task(Model):
     def __init__(self):
+        super(Task,self).__init__(db)
         self.id = ''
         self.text = ''
         self.images = ''
@@ -76,30 +103,25 @@ class Task(Model):
         self._table = "public.task"
         self._strings = ['text', 'images','topic','answer']
 
+class Game(Model):
 
-def main():    
-     import momoko
-     import tornado.ioloop
+    def __init__(self):
+        super(Game, self).__init__(db)
+        self.id = ''
+        self.task_list = ''
+        self._start_timestamp = ''
+        self._end_timestamp = ''
+        self._table = 'public.game'
+        
+    @property
+    def start_timestamp(self):
+        return "'%s'::timestamp" % self._start_timestamp
 
-     ioloop = tornado.ioloop.IOLoop.instance()
-     dsn = "user=postgres password=postgres dbname=qa_bot host=localhost port=5432"
-     db =  momoko.Pool(
-            dsn=dsn,
-            size=1,
-            max_size=3,
-            ioloop=ioloop,
-            setsession=("SET TIME ZONE UTC",),
-            raise_connect_errors=False,
-        )
+    @property
+    def end_timestamp(self):
+        return "'%s'::timestamp" % self._end_timestamp
 
-     a = User()
-     a.chat_id = 5
-     a.progress = 2
-     a.timescore = "123456"
-     print(a.insertThis())
+   
+    
 
-     b = Task()
-     b.id = 5
-     b.text = "blabla"
-     print(b.selectThis())
 
