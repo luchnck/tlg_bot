@@ -50,7 +50,7 @@ class Model():
         query = template.select_from_where(**kwargs)
         print(kwargs)
         result = yield self.execute(query)
-        logging.debug("Model.selectThis: query was finished, query is %s " % query)
+        logging.debug("Model.selectThis: query was finished, query is \n %s " % query)
         raise gen.Return(result)
         
 
@@ -71,17 +71,37 @@ class Model():
         raise gen.Return(result)
         
     def _getNotEmptyVars(self):
-        vars =  [ arg for arg in dir(self) if (not arg.startswith('_')) & ( not callable(getattr(self,arg))) ]
+        vars =  self._getArgs()
         return [arg for arg in vars if getattr(self,arg) != '']
+
+    def _getArgs(self):
+        return [ arg for arg in dir(self) if (not arg.startswith('_')) & ( not callable(getattr(self,arg))) ]
+
+    def setArgs(self, values):
+        for key,val in values.items():
+            print('attribute %s will be setted to %s ' %(key,val) )
+            setattr(self,key, val)
+            print('attribute %s is setted to %s ' %(key,val) )
+
 
     @gen.coroutine
     def selectThis(self):
         notEmpty = self._getNotEmptyVars()
+        fields = self._getArgs()
         where = {}
         for item in notEmpty:
             where[item] = getattr(self,item)
-        result = yield  self.selectSnaql(conds = collections.OrderedDict(where),table = self._table, limit = 1)
-        raise gen.Return(result)
+        result = yield  self.selectSnaql(fields = fields, conds = collections.OrderedDict(where),table = self._table, limit = 1)
+        res = {}
+        i = 0 
+        if (result):
+            logging.debug("Model.selectThis(): result is \n %s", result)
+            logging.debug("Model.selectThis(): fields is \n %s", fields)
+            for x,y in zip(fields,result[0]):
+                res[x] = y
+            self.setArgs(res)
+        else:
+            logging.debug("Model.SelectThis(): Request returns nothing")
 
     def selectAll(self, fields = ''):
         return self.select(where = {},table = self._table)
@@ -107,6 +127,7 @@ class User(Model):
         self.game_id = ''
         self.progress = ''
         self.time_score = ''
+        self.payment = ''
         self._table = "public.user"
         self._strings = []
 
@@ -115,7 +136,7 @@ class User(Model):
 
 
 class Task(Model):
-    def __init__(self):
+    def __init__(self,db):
         super(Task,self).__init__(db)
         self.id = ''
         self.text = ''
@@ -127,23 +148,21 @@ class Task(Model):
 
 class Game(Model):
 
-    def __init__(self):
+    def __init__(self,db):
         super(Game, self).__init__(db)
         self.id = ''
         self.task_list = ''
         self._start_timestamp = ''
         self._end_timestamp = ''
         self._table = 'public.game'
-        
-    @property
-    def start_timestamp(self):
-        return "'%s'::timestamp" % self._start_timestamp
 
-    @property
-    def end_timestamp(self):
-        return "'%s'::timestamp" % self._end_timestamp
-
-   
-    
-
-
+    def getTask(self):
+        if not (isinstance(self.task_list, list)):
+            logging.debug("Game.getTask(): task_list is not a tupple")
+            return
+        regexp = (re.match("^[0-9]+$",str(self.task_list[0])))
+        if not (regexp is None):
+            return self.task_list[0]
+        else:
+            logging.debug("Game.getTask(): value of tupple not integer or digit")
+            return False

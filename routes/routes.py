@@ -3,7 +3,7 @@ import logging
 
 import tornado.gen
 from tornado.web import  RequestHandler
-from models.models import User,Task
+from models.models import User,Task,Game
 
 
 class Action(object):
@@ -43,22 +43,32 @@ class startAction(Action):
 
     @tornado.gen.coroutine
     def do(self):
-        user = User()
+        user = User(self._app.db)
         user.chat_id = ''.join(filter(str.isdigit,str(self.message['message']['chat']['id'])))
-        
         conterQuery = { 
                         'chat_id' : self.message['message']['chat']['id'],
                         'text'    : ''
                       }
 
-        cursor = yield self.application.db.execute(user.selectThis())
-        result = cursor.fetchone()
-        logging.debug("gotted result from db is %s " % str(result))
-        if result != None:
+        yield user.selectThis()
+        #result = cursor.fetchone()
+        logging.debug("gotted result from db is %s " % str(user.chat_id))
+        if user.game_id != '':
             conterQuery['text'] = 'You are already registered!!! Then task'
         else:
-            self.application.db.execute(user.insertThis())
+            yield user.insertThis()
             conterQuery['text'] = 'You will be registered in system, task will be sended in seconds!!!'
+        
+        game = Game(self._app.db)
+        game.id = user.game_id
+        yield game.selectThis()
+        
+        task = Task(self._app.db)
+        task.id = game.getTask()
+        yield task.selectThis() 
+        
+        conterQuery['text'] = task.text
+        
         raise tornado.gen.Return(conterQuery)
 
 class defaultAction(Action):
