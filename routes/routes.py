@@ -1,10 +1,13 @@
 import sys
 import logging
+import re
 
 import tornado.gen
 from tornado.web import  RequestHandler
 from models.models import User,Task,Game
 
+
+logging.basicConfig(level = logging.DEBUG)
 
 class Action(object):
 
@@ -51,8 +54,7 @@ class startAction(Action):
                       }
 
         yield user.selectThis()
-        #result = cursor.fetchone()
-        logging.debug("gotted result from db is %s " % str(user.chat_id))
+        logging.debug("gotted user from db is %s " % str(user.chat_id))
         if user.game_id != '':
             conterQuery['text'] = 'You are already registered!!! Then task'
         else:
@@ -70,6 +72,61 @@ class startAction(Action):
         conterQuery['text'] = task.text
         
         raise tornado.gen.Return(conterQuery)
+
+class answerAction(Action):
+
+    def __init__(self,handler,message):
+        super(answerAction,self).__init__(handler,message)
+
+    @tornado.gen.coroutine
+    def do(self):
+        user = User(self._app.db)
+        user.chat_id = ''.join(filter(str.isdigit,str(self.message['message']['chat']['id'])))
+        find = re.match("/answer[ ]*(.+)", str(self.message['message']['text']), re.IGNORECASE)
+        
+        conterQuery = {
+                        'chat_id' : self.message['message']['chat']['id'],
+                        'text'    : ''
+                      }
+
+        if find is None:
+            conterQuery['text'] = "There is no answer!"
+            logging.warning("answerAction.do(): User's answer don't contain text: \n %s", (self.message['message']['text']))
+            raise tornado.gen.Return(conterQuery)
+        answer = find.groups()[0]
+
+        yield user.selectThis()
+        logging.debug("answerAction.do(): gotted user from db is %s " % str(user.chat_id))
+        
+
+        if (user.game_id == ''):
+            conterQuery['text'] = 'You not take a competition in game, please register by typing "/start" or "/help" for help'
+            logging.warning("answerAction.do(): user dont have permissions to game \n user - %s " % str(user.chat_id))
+            raise tornado.gen.Return(conterQuery)
+
+        game = Game(self._app.db)
+        game.id = user.game_id
+        yield game.selectThis()
+
+        task = Task(self._app.db)
+        task.id = game.getTask()
+        if not (task.id):
+            logging.error("answerAction.do(): task id is not defined for user %s " % str(user.chat_id))
+            conterQuery['text'] = "we don't have any tasks for you, please send /start or /help"
+            raise tornado.gen.Return(conterQuery)
+
+        yield task.selectThis()
+        if not (task.compareAnswer(answer)):
+            logging.info("answerAction.do(): User sended wrong answer: \n user %s, task.answer %s, answer %s", (user.chat_id, task.answer, answer))
+            conterQuery['text'] = "This is wrong answer! Try another"
+            raise tornado.gen.Return(conterQuery)
+        
+        conterQuery['text'] = "Thats right!!, we give you new task soon! Wait.."
+        logging.info("answerAction.do(): User sended right answer and will take new task \n user %s, task.answer %s, answer %s", (user.chat_id, task.answer, answer))
+        raise tornado.gen.Return(conterQuery)
+
+
+
 
 class defaultAction(Action):
 
@@ -100,6 +157,7 @@ class abstractHandler(tornado.web.RequestHandler):
        return {
                   '/default' : defaultAction,
                   '/start' : startAction,
+                  '/answer' : answerAction
               }
 
     def getAction(self, message = {}):
@@ -107,7 +165,7 @@ class abstractHandler(tornado.web.RequestHandler):
        try:
             action = str(message['message']['text'])
        except Exception as e:
-            logging.warning("abstractHandler.getAction() - User's input don't have a action, or text field in request: %s" % message)
+            logging.warning("abstractHandler.getAction():User's input don't have a action, or text field in request: %s" % message)
             return 
        if (action[0] == '/'):
             count = len(action)

@@ -28,17 +28,6 @@ MyURL = "https://54.199.228.119/"
 dsn = "user=postgres password=postgres dbname=qa_bot host=localhost port=5432"
 
 
-CMD = {}
-not_found = '/help'
-
-def start(arguments, message):
-        response = {'chat_id': message['chat']['id']}
-        result = ["Hey, %s!" % message["from"].get("first_name"),tr("\rЗдесь будем выдавать задания")]
-        for command in CMD:
-                result.append(command)
-        response['text'] = "\n\t".join(result)
-        return response
-
 class app(tornado.web.Application):
 
     def sendedMessage(self,response):
@@ -58,73 +47,6 @@ class app(tornado.web.Application):
                                                     )
         response = yield httpClient.fetch( postRequest )
         self.sendedMessage(response)
-
-class TestHandler(tornado.web.RequestHandler):
-    @property
-    def db(self):
-        return self.application.db
-
-    @gen.coroutine
-    def post(self):
-        update = tornado.escape.json_decode(self.request.body)
-
-        cursor = yield self.db.execute('SELECT * FROM public.qa')
-        request =  {
-                                  "text" : "Query results: %s" % cursor.fetchall(),
-                                  "chat_id" : update['message']['chat']['id'],
-                   }
-        response = yield self.application.sendMessage(request)
-        self.finish()       
-
-class Handler(tornado.web.RequestHandler):
-    @property
-    def db(self):
-        return self.application.db
-
-    @gen.coroutine
-    def post(self):
-#        try:
-            logging.debug("Got request: %s" % self.request.body)
-            update = tornado.escape.json_decode(self.request.body)
-            message = update['message']
-            text = message.get('text')
-            logging.debug("message is: %s" % text)
-            if text:
-                logging.info("MESSAGE\t%s\t%s" % (message['chat']['id'], text))
-                if (text[0] == '/'):
-                    command = text
-                    arguments = ''
-                    if (text.find(' ') == True):
-                        command, arguments = text.split(" ", 1)
-#                    if (CMD.has_key(command)):i
-# ToDo:
-# сделать словари парсинга команд 
-# 
-                        response = CMD.get(command)(arguments,message)
-                    else:
-                        response = CMD.get(not_found)(arguments,message)
-                    logging.info("REPLY\t%s\t%s" % (message['chat']['id'], response))
-                    yield self.application.sendMessage(response)
-            self.finish() 
-#        except Exception as e:
-#            logging.warning(str(e))
-
-
-
-
-def send_reply(response):
-        if 'text' in response:
-            api.post(URL + "sendMessage", data=response)
-
-def help_message(arguments, message):
-        response = {'chat_id': message['chat']['id']}
-        result = ["Hey, %s!" % message["from"].get("first_name"),
-              "\rI can accept only these commands:"]
-        for command in CMD:
-                result.append(command)
-        response['text'] = "\n\t".join(result)
-        return response
-
 
 if __name__ == '__main__':
         tornado.httpclient.AsyncHTTPClient.configure("tornado.curl_httpclient.CurlAsyncHTTPClient")

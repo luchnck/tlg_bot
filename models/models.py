@@ -146,6 +146,12 @@ class Task(Model):
         self._table = "public.task"
         self._strings = ['text', 'images','topic','answer']
 
+    def compareAnswer(self, answer):
+        regexp = re.match("^"+self.answer+"$", answer, re.IGNORECASE)
+        if (regexp is None):
+            return False
+        return True
+
 class Game(Model):
 
     def __init__(self,db):
