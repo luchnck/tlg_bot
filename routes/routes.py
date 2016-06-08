@@ -23,6 +23,7 @@ class Action(object):
         #logging.debug("__init__(",args,") initialised")
         self._app = handler.application
         self._message = message
+        self._template = handler.application._db_templates
 
     def __call__(self, *args, **kwargs ):
         #logging.debug("__call__",self)
@@ -46,7 +47,7 @@ class startAction(Action):
 
     @tornado.gen.coroutine
     def do(self):
-        user = User(self._app.db)
+        user = User(self._app.db, self._template)
         user.chat_id = ''.join(filter(str.isdigit,str(self.message['message']['chat']['id'])))
         conterQuery = { 
                         'chat_id' : self.message['message']['chat']['id'],
@@ -54,19 +55,22 @@ class startAction(Action):
                       }
 
         yield user.selectThis()
-        logging.debug("gotted user from db is %s " % str(user.chat_id))
+        logging.debug("startAction.do():gotted user from db is %s " % str(user.chat_id))
         if user.game_id != '':
             conterQuery['text'] = 'You are already registered!!! Then task'
         else:
+            
+            user.game_id = 3
+
             yield user.insertThis()
             conterQuery['text'] = 'You will be registered in system, task will be sended in seconds!!!'
         
-        game = Game(self._app.db)
+        game = Game(self._app.db, self._template)
         game.id = user.game_id
         yield game.selectThis()
         
-        task = Task(self._app.db)
-        task.id = game.getTask()
+        task = Task(self._app.db,self._template)
+        task.id = user.getTask()
         yield task.selectThis() 
         
         conterQuery['text'] = task.text
@@ -80,7 +84,7 @@ class answerAction(Action):
 
     @tornado.gen.coroutine
     def do(self):
-        user = User(self._app.db)
+        user = User(self._app.db,self._template)
         user.chat_id = ''.join(filter(str.isdigit,str(self.message['message']['chat']['id'])))
         find = re.match("/answer[ ]*(.+)", str(self.message['message']['text']), re.IGNORECASE)
         
@@ -104,12 +108,12 @@ class answerAction(Action):
             logging.warning("answerAction.do(): user dont have permissions to game \n user - %s " % str(user.chat_id))
             raise tornado.gen.Return(conterQuery)
 
-        game = Game(self._app.db)
+        game = Game(self._app.db,self._template)
         game.id = user.game_id
         yield game.selectThis()
 
-        task = Task(self._app.db)
-        task.id = game.getTask()
+        task = Task(self._app.db,self._template)
+        task.id = user.getTask()
         if not (task.id):
             logging.error("answerAction.do(): task id is not defined for user %s " % str(user.chat_id))
             conterQuery['text'] = "we don't have any tasks for you, please send /start or /help"
@@ -121,8 +125,17 @@ class answerAction(Action):
             conterQuery['text'] = "This is wrong answer! Try another"
             raise tornado.gen.Return(conterQuery)
         
-        conterQuery['text'] = "Thats right!!, we give you new task soon! Wait.."
-        logging.info("answerAction.do(): User sended right answer and will take new task \n user %s, task.answer %s, answer %s", (user.chat_id, task.answer, answer))
+        conterQuery['text'] = "Thats right!! we give you new task!\n"
+        user.changeTask()
+        user.updateThis()
+
+        self._message['message']['text'] = "/start"
+        
+#        ioloop = tornado.ioloop.IOLoop.current()
+#        ioloop.make_current()
+        tornado.gen.Task(self._app.sendLocalMessage,self._message)
+       
+        logging.info("answerAction.do(): User sended right answer and will take new task \n user %s, task.answer %s, answer %s" % (user.chat_id, task.answer, answer))
         raise tornado.gen.Return(conterQuery)
 
 

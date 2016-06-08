@@ -4,10 +4,11 @@ import logging
 from snaql.factory import Snaql
 
 class Model():
-    def __init__(self,db):
+    def __init__(self,db,template_constructor):
         self._db = db
-        self._snaql = Snaql(os.path.dirname(__file__), 'queries')
-        
+        self._snaql = template_constructor
+        self._strings = []
+        self._lists = []
 #    @property
 #    def db(self):
 #        return self._db
@@ -46,8 +47,7 @@ class Model():
 
     @gen.coroutine
     def selectSnaql(self, *args, **kwargs):
-        template = self._snaql.load_queries('model.sql')
-        query = template.select_from_where(**kwargs)
+        query = self._snaql.select_from_where(**kwargs)
         print(kwargs)
         result = yield self.execute(query)
         logging.debug("Model.selectThis: query was finished, query is \n %s " % query)
@@ -81,16 +81,33 @@ class Model():
         for key,val in values.items():
             print('attribute %s will be setted to %s ' %(key,val) )
             setattr(self,key, val)
-            print('attribute %s is setted to %s ' %(key,val) )
+            print('attribute %s is setted to %s, type is %s' %(key,val,type(val)) )
+
+    def _getFields(self):
+        values = {} 
+        for field in self.__dict__:
+            if not field.startswith('_'):
+                if self.__dict__[field]:
+                    if field in self._strings:
+                        values[field] = "'" + str(self.__dict__[field]) + "'"
+                    elif field in self._lists:
+                        values[field] = "ARRAY"+str(self.__dict__[field])
+                    else:
+                        values[field] = self.__dict__[field]
+        logging.debug("Model._getFields():values will be returned: \n %s" % values)
+        return values
 
 
     @gen.coroutine
     def selectThis(self):
         notEmpty = self._getNotEmptyVars()
         fields = self._getArgs()
-        where = {}
+        where = {self._primary_key : self.__dict__[self._primary_key]}
         for item in notEmpty:
-            where[item] = getattr(self,item)
+            if item in self._strings:
+                where[item] = "'" + getattr(self,item) + "'"
+            else:
+                where[item] = getattr(self,item)
         result = yield  self.selectSnaql(fields = fields, conds = collections.OrderedDict(where),table = self._table, limit = 1)
         res = {}
         i = 0 
@@ -118,26 +135,72 @@ class Model():
         result = yield self.insert(fields,self._table)
         raise gen.Return(result)
 
+    @gen.coroutine
+    def updateThis(self):
+        logging.debug("Model.updateThis(): Updating record in table %s", self._table)
+        
+        table = self._table
+        vals = collections.OrderedDict(self._getFields())
+        where = collections.OrderedDict({self._primary_key:vals.pop(self._primary_key)})
+        
+        query = self._snaql.update_table_set(table = self._table, vals = vals, where = where)
+        logging.debug("Model.updateThis(): Query will be executed: \n %s \n vals = %s", query,vals)
+
+        yield self.execute(query)
+        raise gen.Return(True)        
+
+
 
 class User(Model):
 
-    def __init__(self,db):
-        super(User,self).__init__(db)
+    def __init__(self,db,template):
+        super(User,self).__init__(db,template)
         self.chat_id = ''
         self.game_id = ''
-        self.progress = ''
+        self.task_list = ''
         self.time_score = ''
         self.payment = ''
         self._table = "public.user"
-        self._strings = []
+        self._primary_key = 'chat_id'
+        self._lists = ['task_list']
 
     def isUserRegistered(self):
         pass   
 
+    @gen.coroutine
+    def changeTask(self):
+        
+        if self.task_list is None:
+            logging.warning("User.changeTask(): task_list is not defined")
+            raise gen.Return(False)
+        
+        if ( len(self.task_list) < 1 ):
+            logging.error("User.changeTask(): task_list is empty, it's can't be here")
+            raise gen.Return(False)
+        
+        self.task_list.reverse()
+        self.task_list.pop()
+        self.task_list.reverse()
+        yield self.updateThis()
+        logging.info("User.changeTask(): task list for user %s was updated on %s" % (self.chat_id,self.task_list))
+        if ( len(self.task_list) < 1 ):
+            raise gen.Return(True)
+        raise gen.Return(self.task_list[0])
+
+    def getTask(self):
+        if not (isinstance(self.task_list, list)):
+            logging.debug("User.getTask(): task_list is not a lis, but ", type(self.task_list) )
+            return
+        regexp = (re.match("^[0-9]+$",str(self.task_list[0])))
+        if not (regexp is None):
+            return self.task_list[0]
+        else:
+            logging.debug("User.getTask(): value of tupple not integer or digit")
+            return False
 
 class Task(Model):
-    def __init__(self,db):
-        super(Task,self).__init__(db)
+    def __init__(self,db,template):
+        super(Task,self).__init__(db,template)
         self.id = ''
         self.text = ''
         self.images = ''
@@ -145,6 +208,7 @@ class Task(Model):
         self.answer = ''
         self._table = "public.task"
         self._strings = ['text', 'images','topic','answer']
+        self._primary_key ='id'
 
     def compareAnswer(self, answer):
         regexp = re.match("^"+self.answer+"$", answer, re.IGNORECASE)
@@ -154,21 +218,14 @@ class Task(Model):
 
 class Game(Model):
 
-    def __init__(self,db):
-        super(Game, self).__init__(db)
+    def __init__(self,db,template):
+        super(Game, self).__init__(db,template)
         self.id = ''
         self.task_list = ''
         self._start_timestamp = ''
         self._end_timestamp = ''
         self._table = 'public.game'
+        self._primary_key = 'id'
+        self._strings = []
 
-    def getTask(self):
-        if not (isinstance(self.task_list, list)):
-            logging.debug("Game.getTask(): task_list is not a tupple")
-            return
-        regexp = (re.match("^[0-9]+$",str(self.task_list[0])))
-        if not (regexp is None):
-            return self.task_list[0]
-        else:
-            logging.debug("Game.getTask(): value of tupple not integer or digit")
-            return False
+

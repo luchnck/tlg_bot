@@ -12,6 +12,19 @@
 	{% endif %};
 {% endsql %}
 
-{% sql 'conditions', note = "rendering conditions WHERE" %}
+{% sql 'update_table_set', note = "rendering update query, variables are table, vals, where " %}
+	UPDATE {{ table }}
+        {% if vals %}
+	SET {% for cond,value in vals.items() %}
+	 		{% if loop.index0 > 0 %},{% endif %}
+                        	{{cond}} = {{value}}
+	    {% endfor %}
+        {% endif %}
+        {% if where %}
+	WHERE  {% for cond,value in where.items() %}
+                        {% if loop.index0 > 0 %} AND {% endif %}
+                                {{cond}} = {{value}}
+                {% endfor %};
+        {% endif %}
         
 {% endsql %}

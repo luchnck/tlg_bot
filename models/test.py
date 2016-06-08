@@ -2,12 +2,15 @@ from models import *
 import logging, momoko
 import psycopg2
 import tornado
+from snaql.factory import Snaql
 
 logging.basicConfig(level = logging.DEBUG)
 #db = psycopg2.connect("user=postgres password=postgres dbname=qa_bot host=localhost port=5432")
 
 @gen.coroutine
 def main():    
+
+     template = Snaql('','queries').load_queries('model.sql')
 
      ioloop = tornado.ioloop.IOLoop.current()
      dsn = "user=postgres password=postgres dbname=qa_bot host=localhost port=5432"
@@ -24,35 +27,21 @@ def main():
      ioloop.add_future(future, lambda x: ioloop.stop())
      ioloop.start()
      
-     a = User(db)
-     a.chat_id = 6 
-     a.progress = 2
-     a.time_score = "123456"
+     a = User(db,template)
+     a.chat_id = 135195422 
 
-     b = Task(db)
-     b.id = 6
+     future = a.selectThis()
+     ioloop.add_future(future, lambda x: ioloop.stop())
+     ioloop.start()
+     print(future.result())
 
-     c = Game(db)
-     c.id = 3
- 
-     future = a.insertThis()
+     a.game_id = 4 
+     future = a.updateThis()
      ioloop.add_future(future, lambda x: ioloop.stop())
      ioloop.start()
      print(future.result())
     
      
-     future = b.selectThis()
-     ioloop.add_future(future, lambda x: ioloop.stop())
-     ioloop.start()
-     print(future.result())
-
-     future = c.selectThis()
-     ioloop.add_future(future, lambda x: ioloop.stop())
-     ioloop.start()
-     print(future.result())
-
-     print(c.getTask())
- 
 #print(user.execute(user.selectThis()))
 
 main()

@@ -11,6 +11,7 @@ import momoko
 from pprint import pprint
 from inspect import getmembers
 import json
+from snaql.factory import Snaql
 
 sys.path.append(os.path.abspath('routes'))
 sys.path.append(os.path.abspath('models'))
@@ -30,6 +31,10 @@ dsn = "user=postgres password=postgres dbname=qa_bot host=localhost port=5432"
 
 class app(tornado.web.Application):
 
+    def __init__(self, *args, **kwargs):
+        super(app,self).__init__(*args,**kwargs)
+        self._db_templates = ''
+
     def sendedMessage(self,response):
         logging.debug('Message sended successifilly response is %s' % response)
     
@@ -47,9 +52,26 @@ class app(tornado.web.Application):
                                                     )
         response = yield httpClient.fetch( postRequest )
         self.sendedMessage(response)
+   
+    @gen.coroutine 
+    def sendLocalMessage(self,response):
+        yield gen.sleep(1)
+        logging.debug('Message will be sent on url %s' % "localhost")
+        httpClient = tornado.httpclient.AsyncHTTPClient()
+        postRequest = tornado.httpclient.HTTPRequest( url= "localhost:8001",
+                                                      method="POST",
+                                                      body=json.dumps(response),
+                                                      headers=tornado.httputil.HTTPHeaders( {
+                                                                                             "content-type": "application/json",
+                                                                                             "method": "POST"
+                                                                                             } )
+                                                    )
+        response = yield httpClient.fetch( postRequest )
+        self.sendedMessage(response)
 
 if __name__ == '__main__':
         tornado.httpclient.AsyncHTTPClient.configure("tornado.curl_httpclient.CurlAsyncHTTPClient")
+#        tornado.ioloop.IOLoop.make_current()
         ioloop = tornado.ioloop.IOLoop.instance() 
         api = requests.Session()
         application = app([
@@ -73,6 +95,8 @@ if __name__ == '__main__':
             raise_connect_errors=False,
         )
 
+        application._db_templates = Snaql('models/','queries').load_queries('model.sql')
+
         future = application.db.connect()
         ioloop.add_future(future, lambda f: ioloop.stop())
         ioloop.start()
@@ -80,3 +104,6 @@ if __name__ == '__main__':
 
         application.listen(8001)
         ioloop.start()
+
+
+
