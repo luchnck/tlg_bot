@@ -125,17 +125,30 @@ class answerAction(Action):
             conterQuery['text'] = "This is wrong answer! Try another"
             raise tornado.gen.Return(conterQuery)
         
-        conterQuery['text'] = "Thats right!! we give you new task!\n"
-        user.changeTask()
-        user.updateThis()
+        currentTask = yield user.changeTask()
+        
+ 
+        if not currentTask is False:
+            if currentTask is True:
+                self._message['message']['text'] = "/finish"
+                logging.info("answerAction.do(): User will be redirrected to /finish\n changeTask returned %s" % currentTask)
+            else:
+                self._message['message']['text'] = "/start"
+                logging.info("answerAction.do(): User will be redirrected to /start\n changeTask returned %s" % currentTask)
+            
+            logging.info("answerAction.do(): User sended right answer and will take new task \n user %s, task.answer %s, answer %s" % (user.chat_id, task.answer, answer))
+            conterQuery['text'] = "Thats right!!"
+            tornado.gen.Task(self._app.sendLocalMessage,self._message)
+                
+        else:
+            conterQuery['text'] = "Something wrong, please contact administrator"
+            
 
-        self._message['message']['text'] = "/start"
+
         
 #        ioloop = tornado.ioloop.IOLoop.current()
 #        ioloop.make_current()
-        tornado.gen.Task(self._app.sendLocalMessage,self._message)
        
-        logging.info("answerAction.do(): User sended right answer and will take new task \n user %s, task.answer %s, answer %s" % (user.chat_id, task.answer, answer))
         raise tornado.gen.Return(conterQuery)
 
 

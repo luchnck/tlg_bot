@@ -77,37 +77,49 @@ class Model():
     def _getArgs(self):
         return [ arg for arg in dir(self) if (not arg.startswith('_')) & ( not callable(getattr(self,arg))) ]
 
-    def setArgs(self, values):
+    def _setArgs(self, values):
         for key,val in values.items():
-            print('attribute %s will be setted to %s ' %(key,val) )
+            logging.debug('attribute %s will be setted to %s ' %(key,val) )
             setattr(self,key, val)
-            print('attribute %s is setted to %s, type is %s' %(key,val,type(val)) )
+            logging.debug('attribute %s is setted to %s, type is %s' %(key,val,type(val)) )
 
-    def _getFields(self):
+    def _getFields(self, **kwargs):
+        fields = []
         values = {} 
+        if 'fields' in  kwargs.keys():
+            fields = kwargs['fields']
+
         for field in self.__dict__:
             if not field.startswith('_'):
-                if self.__dict__[field]:
+                if (self.__dict__[field]) or (field in fields):
                     if field in self._strings:
                         values[field] = "'" + str(self.__dict__[field]) + "'"
                     elif field in self._lists:
                         values[field] = "ARRAY"+str(self.__dict__[field])
+                        if not self.__dict__[field]:
+                            values[field] += "::integer[]"
                     else:
                         values[field] = self.__dict__[field]
         logging.debug("Model._getFields():values will be returned: \n %s" % values)
         return values
 
-
+#    Логика работы: выбирает из базы значение по self._primary_key если не установлено
+#    выбирается запись соответствующая заполненным полям текущего объекта
+#    выбранные значения устанавливаются в поля объекта
+#    Выбирается одна запись!!!
     @gen.coroutine
     def selectThis(self):
         notEmpty = self._getNotEmptyVars()
         fields = self._getArgs()
-        where = {self._primary_key : self.__dict__[self._primary_key]}
-        for item in notEmpty:
-            if item in self._strings:
-                where[item] = "'" + getattr(self,item) + "'"
-            else:
-                where[item] = getattr(self,item)
+        if not self.__dict__[self._primary_key]:
+             where = self._getFields
+#            for item in notEmpty:
+#                if item in self._strings:
+#                    where[item] = "'" + getattr(self,item) + "'"
+#                else:
+#                    where[item] = getattr(self,item)
+        else:
+            where = {self._primary_key : self.__dict__[self._primary_key]}
         result = yield  self.selectSnaql(fields = fields, conds = collections.OrderedDict(where),table = self._table, limit = 1)
         res = {}
         i = 0 
@@ -116,7 +128,7 @@ class Model():
             logging.debug("Model.selectThis(): fields is \n %s", fields)
             for x,y in zip(fields,result[0]):
                 res[x] = y
-            self.setArgs(res)
+            self._setArgs(res)
         else:
             logging.debug("Model.SelectThis(): Request returns nothing")
 
@@ -136,11 +148,14 @@ class Model():
         raise gen.Return(result)
 
     @gen.coroutine
-    def updateThis(self):
+    def updateThis(self, **kwargs):
+        fields = []
+        if 'fields' in kwargs.keys():
+            fields = kwargs['fields']
         logging.debug("Model.updateThis(): Updating record in table %s", self._table)
         
         table = self._table
-        vals = collections.OrderedDict(self._getFields())
+        vals = collections.OrderedDict(self._getFields(fields = fields))
         where = collections.OrderedDict({self._primary_key:vals.pop(self._primary_key)})
         
         query = self._snaql.update_table_set(table = self._table, vals = vals, where = where)
@@ -167,9 +182,13 @@ class User(Model):
     def isUserRegistered(self):
         pass   
 
+#	Логика работы: проверить self.task_list если что-то неверно вернет False
+#	если задания кончились возвращает True
+#	если задания есть удалит текущее и вернет следующее
+#	актуализирует информацию в базе
+
     @gen.coroutine
     def changeTask(self):
-        
         if self.task_list is None:
             logging.warning("User.changeTask(): task_list is not defined")
             raise gen.Return(False)
@@ -191,7 +210,11 @@ class User(Model):
         if not (isinstance(self.task_list, list)):
             logging.debug("User.getTask(): task_list is not a lis, but ", type(self.task_list) )
             return
-        regexp = (re.match("^[0-9]+$",str(self.task_list[0])))
+        try:
+            regexp = (re.match("^[0-9]+$",str(self.task_list[0])))
+        except Exception as e:
+            logging.debug("User.getTask(): can't take a regexp for task_list, because %s" % e)
+            return False
         if not (regexp is None):
             return self.task_list[0]
         else:

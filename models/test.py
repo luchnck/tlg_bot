@@ -27,19 +27,28 @@ def main():
      ioloop.add_future(future, lambda x: ioloop.stop())
      ioloop.start()
      
-     a = User(db,template)
+     a = User(db,template)     
      a.chat_id = 135195422 
+     future = a.selectThis()
+     ioloop.add_future(future, lambda x: ioloop.stop())
+     ioloop.start()
+     print(future.result())
+     
+     a.task_list = [6,7,8]
+     a.changeTask()
+     future = a.updateThis(fields = ["task_list"])
+     ioloop.add_future(future, lambda x: ioloop.stop())
+     ioloop.start()
+     print(future.result())
 
      future = a.selectThis()
      ioloop.add_future(future, lambda x: ioloop.stop())
      ioloop.start()
      print(future.result())
+     
+     
 
-     a.game_id = 4 
-     future = a.updateThis()
-     ioloop.add_future(future, lambda x: ioloop.stop())
-     ioloop.start()
-     print(future.result())
+    
     
      
 #print(user.execute(user.selectThis()))
