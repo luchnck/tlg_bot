@@ -200,12 +200,17 @@ class User(Model):
         self.task_list.reverse()
         self.task_list.pop()
         self.task_list.reverse()
-        yield self.updateThis()
+        yield self.updateThis(fields = ['task_list'])
         logging.info("User.changeTask(): task list for user %s was updated on %s" % (self.chat_id,self.task_list))
         if ( len(self.task_list) < 1 ):
             raise gen.Return(True)
         raise gen.Return(self.task_list[0])
 
+
+#   Логика работы: возвращает false если не удалось получить таску, возвращает текущее задание если ок 
+#
+#
+#
     def getTask(self):
         if not (isinstance(self.task_list, list)):
             logging.debug("User.getTask(): task_list is not a lis, but ", type(self.task_list) )

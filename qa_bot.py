@@ -1,4 +1,4 @@
-#! /usr/bin/python3
+#! /usr/bin/python3.5
 # -*- coding: utf-8 -*-
 
 import os
@@ -19,19 +19,13 @@ sys.path.append(os.path.abspath('models'))
 
 from routes.routes import mainHandler
 
-logging.basicConfig(level = logging.DEBUG)
-
+options.logging = None
 define("token", default="basictoken")
 define("url", default="basicurl")
 define("myurl", default="basicurl")
 define("serverurl", default="basicurl")
 define("serverport", default="defaultport")
 define("dsn", default="basicdsn")
-#BOT_TOKEN = '235765450:AAGWZ5N-0OFylLjOpmYXUQfBZlI-Cd0y-28'
-#URL = "https://api.telegram.org/bot%s/" % BOT_TOKEN
-#MyURL = "https://54.199.228.119/"
-#URL = "http://localhost:8001/"
-#dsn = "user=postgres password=postgres dbname=qa_bot host=localhost port=5432"
 
 
 class app(tornado.web.Application):
@@ -76,6 +70,7 @@ class app(tornado.web.Application):
 
 if __name__ == '__main__':
         parse_config_file(os.path.abspath('')+'/options.conf')
+        logging.basicConfig(level = logging.DEBUG)
         tornado.httpclient.AsyncHTTPClient.configure("tornado.curl_httpclient.CurlAsyncHTTPClient")
         ioloop = tornado.ioloop.IOLoop.instance() 
         api = requests.Session()

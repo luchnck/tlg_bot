@@ -63,6 +63,10 @@ class startAction(Action):
         
         task = Task(self._app.db,self._template)
         task.id = user.getTask()
+        if task.id is False:
+            conterQuery['text'] = "Task list is empty, may be game over???"
+            raise tornado.gen.Return(conterQuery)
+
         yield task.selectThis() 
         
         conterQuery['text'] = task.text
@@ -130,7 +134,7 @@ class answerAction(Action):
             
             logging.info("answerAction.do(): User sended right answer and will take new task \n user %s, task.answer %s, answer %s" % (user.chat_id, task.answer, answer))
             conterQuery['text'] = "Thats right!!"
-            tornado.gen.Task(self._app.sendLocalMessage,self._message,10)
+            tornado.gen.Task(self._app.sendLocalMessage,self._message,2)
                 
         else:
             conterQuery['text'] = "Something wrong, please contact administrator"
@@ -145,11 +149,45 @@ class finishAction(Action):
 
     @tornado.gen.coroutine
     def do(self):
+        user = User(self._app.db, self._template)
+        user.chat_id = self.message['message']['chat']['id']
+        yield user.selectThis()
+        
         conterQuery = {
                         'chat_id' : self.message['message']['chat']['id'],
                         'text'    : 'Congratulations! You\' game was finished!!!'
                       }
+
+        if user.task_list != []:
+            self._message['message']['text'] = '/start'
+            tornado.gen.Task(self._app.sendLocalMessage, self._message,2)
+            conterQuery['text'] = 'You don\'t finish the game, do following task first!!!'
+        
         logging.debug("finishAction.do(): User has finished the game")
+        raise tornado.gen.Return(conterQuery)
+
+
+class resetAction(Action):
+    def __init__(self,handler,message):
+        super(resetAction, self).__init__(handler,message)
+
+    @tornado.gen.coroutine
+    def do(self):
+        user = User(self._app.db,self._template)
+        user.chat_id = ''.join(filter(str.isdigit,str(self.message['message']['chat']['id'])))
+        yield user.selectThis()
+        
+        game = Game(self._app.db, self._template)
+        game.id = user.game_id
+        yield game.selectThis()
+        
+        user.task_list = game.task_list
+        yield user.updateThis()
+        conterQuery = {
+                        'chat_id' : self.message['message']['chat']['id'],
+                        'text'    : 'Ваша игра будет обновлена!!!'
+                      } 
+
         raise tornado.gen.Return(conterQuery)
 
 
@@ -170,9 +208,6 @@ class defaultAction(Action):
 
 class abstractHandler(tornado.web.RequestHandler):
    
-   # def __init__(self, application):
-   #     self.application = application
- 
     @property
     def db(self):
        return self.application.db
@@ -183,7 +218,8 @@ class abstractHandler(tornado.web.RequestHandler):
                   '/default' : defaultAction,
                   '/start' : startAction,
                   '/answer' : answerAction,
-                  '/finish' : finishAction
+                  '/finish' : finishAction,
+                  '/reset'  : resetAction,
               }
 
     def getAction(self, message = {}):
