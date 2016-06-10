@@ -11,22 +11,14 @@ logging.basicConfig(level = logging.DEBUG)
 
 class Action(object):
 
-#    def __new__(cls,*args, **kwargs):
-#        print("__new__",cls)
-#        obj = super(Action,cls).__new__(Action)
-#        print ("created object", obj)
-#        return obj    
-
     def __init__(self,*args,**kwargs):
         handler = args[0]
         message = args[1]
-        #logging.debug("__init__(",args,") initialised")
         self._app = handler.application
         self._message = message
         self._template = handler.application._db_templates
 
     def __call__(self, *args, **kwargs ):
-        #logging.debug("__call__",self)
         return self
    
     @property
@@ -138,20 +130,27 @@ class answerAction(Action):
             
             logging.info("answerAction.do(): User sended right answer and will take new task \n user %s, task.answer %s, answer %s" % (user.chat_id, task.answer, answer))
             conterQuery['text'] = "Thats right!!"
-            tornado.gen.Task(self._app.sendLocalMessage,self._message)
+            tornado.gen.Task(self._app.sendLocalMessage,self._message,10)
                 
         else:
             conterQuery['text'] = "Something wrong, please contact administrator"
             
-
-
-        
-#        ioloop = tornado.ioloop.IOLoop.current()
-#        ioloop.make_current()
-       
         raise tornado.gen.Return(conterQuery)
 
 
+class finishAction(Action):
+
+    def __init__(self,handler,message):
+        super(finishAction, self).__init__(handler,message)
+
+    @tornado.gen.coroutine
+    def do(self):
+        conterQuery = {
+                        'chat_id' : self.message['message']['chat']['id'],
+                        'text'    : 'Congratulations! You\' game was finished!!!'
+                      }
+        logging.debug("finishAction.do(): User has finished the game")
+        raise tornado.gen.Return(conterQuery)
 
 
 class defaultAction(Action):
@@ -183,7 +182,8 @@ class abstractHandler(tornado.web.RequestHandler):
        return {
                   '/default' : defaultAction,
                   '/start' : startAction,
-                  '/answer' : answerAction
+                  '/answer' : answerAction,
+                  '/finish' : finishAction
               }
 
     def getAction(self, message = {}):
@@ -218,5 +218,8 @@ class mainHandler(abstractHandler):
         responseConter = yield self.application.sendMessage(conterQuery)
         logging.debug("recieved answer from tlgServer is %s" % responseConter)
         self.finish() 
+
+
+        raise tornado.gen.Return(conterQuery)
 
 
